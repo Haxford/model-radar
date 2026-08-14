@@ -204,12 +204,55 @@ volumes:
         </div>
 
         <div className="mt-8 rounded-lg border border-border bg-muted/20 p-4">
+          <h3 className="text-sm font-semibold">Other config formats</h3>
+          <p className="mt-1 text-xs text-muted-foreground">
+            The Export button on the models page also supports these formats:
+          </p>
+          <div className="mt-2 space-y-1 text-xs text-muted-foreground">
+            <p><strong className="text-foreground">🤖 Hermes Agent</strong> — generates <code className="rounded bg-muted px-1">~/.hermes/config.yaml</code> with OpenRouter provider and fallback models.</p>
+            <p><strong className="text-foreground">🦞 OpenClaw</strong> — OpenAI-compatible provider config pointing at <code className="rounded bg-muted px-1">https://openrouter.ai/api/v1</code>.</p>
+            <p><strong className="text-foreground">🧭 Odysseus</strong> — cloud/API model config for Odysseus with model IDs.</p>
+            <p><strong className="text-foreground">💬 Open WebUI</strong> — list of model IDs to paste into Settings → Models.</p>
+          </div>
+        </div>
+
+        <div className="mt-8 rounded-lg border border-border bg-muted/20 p-4">
           <h3 className="text-sm font-semibold">Capability filters explained</h3>
           <div className="mt-2 space-y-1 text-xs text-muted-foreground">
             <p><strong className="text-foreground">Tools</strong> — supports function/tool calling. Required for Open WebUI's built-in tools and function calls.</p>
             <p><strong className="text-foreground">Structured</strong> — supports JSON schema / structured output. Good for agentic pipelines.</p>
             <p><strong className="text-foreground">Vision</strong> — accepts image inputs. For multimodal chat with image uploads.</p>
             <p><strong className="text-foreground">Web Search</strong> — supports OpenRouter's native web search option.</p>
+          </div>
+        </div>
+
+        <div className="mt-8 rounded-lg border border-border bg-muted/20 p-4">
+          <h3 className="text-sm font-semibold">Benchmark scores</h3>
+          <div className="mt-2 space-y-1 text-xs text-muted-foreground">
+            <p>
+              Click <strong className="text-foreground">"Load scores"</strong> on the models page to fetch
+              Arena AI (LMArena) ELO scores from{" "}
+              <a href="https://arena.ai/leaderboard" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">
+                arena.ai <ExternalLink className="inline h-3 w-3" />
+              </a>{" "}
+              via daily snapshots. Models are matched by name similarity and vendor.
+              Scores appear as badges (🏆 ELO · rank) on model cards and in the comparison view.
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-8 rounded-lg border border-border bg-muted/20 p-4">
+          <h3 className="text-sm font-semibold">Install as app (PWA)</h3>
+          <div className="mt-2 space-y-1 text-xs text-muted-foreground">
+            <p>
+              OpenRouter Radar is a Progressive Web App — install it to your home screen
+              for quick access and offline browsing. Model data is cached for offline use.
+            </p>
+            <p className="mt-1">
+              <strong className="text-foreground">Chrome/Edge:</strong> click the install icon in the address bar.{" "}
+              <strong className="text-foreground">Safari (iOS):</strong> Share → Add to Home Screen.{" "}
+              <strong className="text-foreground">Safari (Mac):</strong> File → Add to Dock.
+            </p>
           </div>
         </div>
       </div>

@@ -96,7 +96,7 @@ export function CompareDrawer({ models, benchmarks, open, onClose, onRemove }: C
       render: (m) => {
         const b = benchmarks[m.id];
         if (!b?.text) return "—";
-        return `#${b.arenaModel.rank} (${b.arenaModel.score})`;
+        return `#${b.text.arenaModel.rank} (${b.text.arenaModel.score})`;
       },
       highlight: (ms) => {
         const ranks = ms.map(m => benchmarks[m.id]?.text?.arenaModel.rank);
@@ -111,7 +111,7 @@ export function CompareDrawer({ models, benchmarks, open, onClose, onRemove }: C
       render: (m) => {
         const b = benchmarks[m.id];
         if (!b?.code) return "—";
-        return `#${b.arenaModel.rank} (${b.arenaModel.score})`;
+        return `#${b.code.arenaModel.rank} (${b.code.arenaModel.score})`;
       },
     },
     {
@@ -119,7 +119,7 @@ export function CompareDrawer({ models, benchmarks, open, onClose, onRemove }: C
       render: (m) => {
         const b = benchmarks[m.id];
         if (!b?.vision) return "—";
-        return `#${b.arenaModel.rank} (${b.arenaModel.score})`;
+        return `#${b.vision.arenaModel.rank} (${b.vision.arenaModel.score})`;
       },
     },
   ];
