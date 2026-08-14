@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -13,11 +13,15 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ModelCard } from "@/components/model-card";
+import { CompareDrawer } from "@/components/compare-drawer";
+import { CostCalculator } from "@/components/cost-calculator";
+import { ConfigExport } from "@/components/config-export";
 import { useBookmarks } from "@/lib/use-bookmarks";
 import {
   type OpenRouterModel,
   type SortKey,
   type SortDir,
+  type ConfigFormat,
   CATEGORIES,
   SORT_OPTIONS,
   DEFAULT_DIR,
@@ -32,14 +36,14 @@ import {
   hasStructuredOutput,
   hasVision,
   hasWebSearch,
-  hasImageGen,
-  hasAudioOutput,
-  hasVideoInput,
   litellmYaml,
+  CONFIG_FORMATS,
+  bulkConfig,
 } from "@/lib/model-utils";
+import { fetchAllLeaderboards, matchModelToBenchmarks, bestBenchmarkScore, type BenchmarkMatch } from "@/lib/benchmarks";
 import {
   Search, RefreshCw, Loader2, Star, Wrench, Braces, Globe,
-  Eye, Image as ImageIcon, Volume2, Video, FileCode, Check, Copy,
+  Eye, FileCode, Check, Copy, GitCompare, Calculator, Download,
 } from "lucide-react";
 
 interface ModelRadarProps {
@@ -59,14 +63,44 @@ export function ModelRadar({ models, onRefresh }: ModelRadarProps) {
   const [onlyWorth, setOnlyWorth] = useState(false);
   const [onlyNew, setOnlyNew] = useState(false);
 
-  // Capability filters (for Open WebUI / LiteLLM use cases)
+  // Capability filters
   const [capTools, setCapTools] = useState(false);
   const [capStructured, setCapStructured] = useState(false);
   const [capVision, setCapVision] = useState(false);
   const [capWebSearch, setCapWebSearch] = useState(false);
 
-  // Bulk LiteLLM YAML export (bookmarks or current view)
-  const [copiedBulkYaml, setCopiedBulkYaml] = useState(false);
+  // Compare / cost / export state
+  const [compareSet, setCompareSet] = useState<Set<string>>(new Set());
+  const [compareOpen, setCompareOpen] = useState(false);
+  const [calcOpen, setCalcOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
+  const [exportFormat, setExportFormat] = useState<ConfigFormat>("litellm");
+
+  // Benchmarks
+  const [benchmarks, setBenchmarks] = useState<{
+    text: Awaited<ReturnType<typeof fetchAllLeaderboards>>["text"];
+    code: Awaited<ReturnType<typeof fetchAllLeaderboards>>["code"];
+    vision: Awaited<ReturnType<typeof fetchAllLeaderboards>>["vision"];
+  } | null>(null);
+  const [benchmarksLoading, setBenchmarksLoading] = useState(false);
+
+  const benchmarkMap = useMemo(() => {
+    if (!benchmarks) return new Map<string, ReturnType<typeof matchModelToBenchmarks>>();
+    const map = new Map<string, ReturnType<typeof matchModelToBenchmarks>>();
+    for (const m of models) {
+      map.set(m.id, matchModelToBenchmarks(m, benchmarks));
+    }
+    return map;
+  }, [models, benchmarks]);
+
+  // Fetch benchmarks lazily when user first opens compare or toggles benchmark view
+  const loadBenchmarks = async () => {
+    if (benchmarks || benchmarksLoading) return;
+    setBenchmarksLoading(true);
+    const data = await fetchAllLeaderboards();
+    setBenchmarks(data);
+    setBenchmarksLoading(false);
+  };
 
   const capFilters: { key: string; label: string; icon: React.ReactNode; state: boolean; set: (v: boolean) => void; check: (m: OpenRouterModel) => boolean }[] = [
     { key: "tools", label: "Tools", icon: <Wrench className="h-3.5 w-3.5" />, state: capTools, set: setCapTools, check: hasToolCalling },
@@ -108,33 +142,24 @@ export function ModelRadar({ models, onRefresh }: ModelRadarProps) {
   const visible = useMemo(() => {
     let list = models.slice();
 
-    // Category filter
     if (category === "bookmarks") {
       list = list.filter((m) => bookmarks.has(m.id));
     } else if (category !== "all") {
       list = list.filter((m) => modelCategory(m).includes(category as never));
     }
 
-    // Quick filters
-    if (onlyWorth) {
-      list = list.filter((m) => worthTrying(m));
-    }
-    if (onlyNew) {
-      list = list.filter((m) => isNew(m));
-    }
+    if (onlyWorth) list = list.filter((m) => worthTrying(m));
+    if (onlyNew) list = list.filter((m) => isNew(m));
 
-    // Capability filters
     if (capTools) list = list.filter((m) => hasToolCalling(m));
     if (capStructured) list = list.filter((m) => hasStructuredOutput(m));
     if (capVision) list = list.filter((m) => hasVision(m));
     if (capWebSearch) list = list.filter((m) => hasWebSearch(m));
 
-    // Provider filter
     if (providerFilter.size > 0) {
       list = list.filter((m) => providerFilter.has(providerOf(m.id)));
     }
 
-    // Search
     if (search.trim()) {
       const q = search.toLowerCase();
       list = list.filter(
@@ -153,7 +178,6 @@ export function ModelRadar({ models, onRefresh }: ModelRadarProps) {
     return sortModels(visible, sortKey, sortDir);
   }, [visible, sortKey, sortDir]);
 
-  // When sort key changes, reset dir to the sensible default for that key
   const handleSortKeyChange = (key: SortKey) => {
     setSortKey(key);
     setSortDir(DEFAULT_DIR[key]);
@@ -172,6 +196,41 @@ export function ModelRadar({ models, onRefresh }: ModelRadarProps) {
     });
   };
 
+  const toggleCompare = (id: string) => {
+    setCompareSet((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else if (next.size < 5) next.add(id);
+      return next;
+    });
+  };
+
+  const compareModels = useMemo(
+    () => models.filter((m) => compareSet.has(m.id)),
+    [models, compareSet],
+  );
+
+  const compareBenchmarks = useMemo(() => {
+    const map: Record<string, { text?: BenchmarkMatch; code?: BenchmarkMatch; vision?: BenchmarkMatch }> = {};
+    for (const m of compareModels) {
+      map[m.id] = benchmarkMap.get(m.id) || {};
+    }
+    return map;
+  }, [compareModels, benchmarkMap]);
+
+  // Get benchmark score for a model card
+  const getBenchmarkBadge = (m: OpenRouterModel): { score: number | null; rank: number | null } => {
+    const b = benchmarkMap.get(m.id);
+    if (!b) return { score: null, rank: null };
+    const score = bestBenchmarkScore(b);
+    // Get rank from the first available leaderboard
+    let rank: number | null = null;
+    if (b.text?.arenaModel.rank) rank = b.text.arenaModel.rank;
+    else if (b.code?.arenaModel.rank) rank = b.code.arenaModel.rank;
+    else if (b.vision?.arenaModel.rank) rank = b.vision.arenaModel.rank;
+    return { score, rank };
+  };
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       {/* Header */}
@@ -185,10 +244,7 @@ export function ModelRadar({ models, onRefresh }: ModelRadarProps) {
             New · cheap · worth-trying models
           </span>
           <div className="flex-1" />
-          <a
-            href="/setup"
-            className="text-sm text-blue-400 hover:underline"
-          >
+          <a href="/setup" className="text-sm text-blue-400 hover:underline">
             Setup Guide
           </a>
           <div className="relative">
@@ -335,19 +391,47 @@ export function ModelRadar({ models, onRefresh }: ModelRadarProps) {
               Showing {sorted.length} model{sorted.length !== 1 ? "s" : ""}
             </span>
             <div className="flex-1" />
+
+            {/* Action buttons */}
             <Button
               variant="outline"
               size="sm"
-              onClick={() => {
-                const list = sorted.length > 0 ? sorted : models;
-                navigator.clipboard.writeText(litellmYaml(list));
-                setCopiedBulkYaml(true);
-                setTimeout(() => setCopiedBulkYaml(false), 1500);
-              }}
-              title="Copy LiteLLM config YAML for all visible models"
+              onClick={() => loadBenchmarks()}
+              disabled={benchmarksLoading || !!benchmarks}
+              title="Load Arena AI (LMArena) benchmark scores"
             >
-              {copiedBulkYaml ? <Check className="h-4 w-4 text-green-400" /> : <FileCode className="h-4 w-4" />}
-              {copiedBulkYaml ? "Copied!" : "Copy LiteLLM YAML"}
+              {benchmarksLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Star className="h-4 w-4" />}
+              {benchmarks ? "Scores loaded" : "Load scores"}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCalcOpen(true)}
+              disabled={compareSet.size === 0}
+              title="Cost calculator for selected models"
+            >
+              <Calculator className="h-4 w-4" />
+              Calculator
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setExportOpen(true)}
+              disabled={sorted.length === 0}
+              title="Export config for all visible models"
+            >
+              <Download className="h-4 w-4" />
+              Export
+            </Button>
+            <Button
+              variant={compareSet.size > 0 ? "default" : "outline"}
+              size="sm"
+              onClick={() => { setCompareOpen(true); loadBenchmarks(); }}
+              disabled={compareSet.size === 0}
+              title="Compare selected models side-by-side"
+            >
+              <GitCompare className="h-4 w-4" />
+              Compare ({compareSet.size})
             </Button>
           </div>
 
@@ -375,14 +459,21 @@ export function ModelRadar({ models, onRefresh }: ModelRadarProps) {
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-              {sorted.map((m) => (
-                <ModelCard
-                  key={m.id}
-                  model={m}
-                  bookmarked={loaded && has(m.id)}
-                  onToggleBookmark={toggle}
-                />
-              ))}
+              {sorted.map((m) => {
+                const bench = getBenchmarkBadge(m);
+                return (
+                  <ModelCard
+                    key={m.id}
+                    model={m}
+                    bookmarked={loaded && has(m.id)}
+                    onToggleBookmark={toggle}
+                    comparing={compareSet.has(m.id)}
+                    onToggleCompare={toggleCompare}
+                    benchmarkScore={bench.score}
+                    benchmarkRank={bench.rank}
+                  />
+                );
+              })}
             </div>
           )}
         </main>
@@ -399,13 +490,36 @@ export function ModelRadar({ models, onRefresh }: ModelRadarProps) {
         >
           OpenRouter public API
         </a>{" "}
-        · Bookmarks stored locally · Copy model IDs or{" "}
-        <a href="/setup" className="text-blue-400 hover:underline">LiteLLM YAML configs</a>{" "}
-        to connect to{" "}
-        <a href="https://openwebui.com" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">Open WebUI</a>{" "}
-        and{" "}
-        <a href="https://docs.litellm.ai" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">LiteLLM</a>
+        · Benchmarks from{" "}
+        <a href="https://arena.ai/leaderboard" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">
+          Arena.ai (LMArena)
+        </a>{" "}
+        · Bookmarks stored locally ·{" "}
+        <a href="/setup" className="text-blue-400 hover:underline">Setup Guide</a>{" "}
+        for Open WebUI, LiteLLM, Hermes, OpenClaw & Odysseus
       </footer>
+
+      {/* Modals */}
+      <CompareDrawer
+        models={compareModels}
+        benchmarks={compareBenchmarks}
+        open={compareOpen}
+        onClose={() => setCompareOpen(false)}
+        onRemove={(id) => toggleCompare(id)}
+      />
+      <CostCalculator
+        models={models}
+        open={calcOpen}
+        onClose={() => setCalcOpen(false)}
+        selectedIds={compareSet}
+        onToggle={toggleCompare}
+      />
+      <ConfigExport
+        models={compareModels.length > 0 ? compareModels : sorted}
+        open={exportOpen}
+        onClose={() => setExportOpen(false)}
+        defaultFormat={exportFormat}
+      />
     </div>
   );
 }

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#0a0a0a"/>
+  <text x="256" y="200" font-size="120" text-anchor="middle" font-family="system-ui, sans-serif" font-weight="bold">⚡</text>
+  <text x="256" y="320" font-size="64" text-anchor="middle" font-family="system-ui, sans-serif" font-weight="bold" fill="#22c55e">OpenRouter</text>
+  <text x="256" y="390" font-size="64" text-anchor="middle" font-family="system-ui, sans-serif" font-weight="bold" fill="#3b82f6">Radar</text>
+</svg>

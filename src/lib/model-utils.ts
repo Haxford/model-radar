@@ -258,6 +258,142 @@ export function openWebuiEnvKey(modelId: string): string {
 OPENROUTER_MODEL=${modelId}`;
 }
 
+// ── Hermes Agent config ──────────────────────────────────────────────
+export function hermesConfig(m: OpenRouterModel): string {
+  return `# ~/.hermes/config.yaml
+model:
+  provider: openrouter
+  default: "${m.id}"`;
+}
+
+export function hermesBulkConfig(models: OpenRouterModel[]): string {
+  const primary = models[0];
+  const fallbacks = models.slice(1).map((m) =>
+    `  - provider: openrouter
+    model: "${m.id}"`
+  ).join("\n");
+  return `# ~/.hermes/config.yaml
+model:
+  provider: openrouter
+  default: "${primary.id}"
+${fallbacks ? `\nfallback_providers:\n${fallbacks}` : ""}`;
+}
+
+// ── OpenClaw config ──────────────────────────────────────────────────
+export function openclawConfig(m: OpenRouterModel): string {
+  return `# OpenClaw provider config
+provider: openai-compatible
+base_url: https://openrouter.ai/api/v1
+api_key: \${OPENROUTER_API_KEY}
+model: "${m.id}"`;
+}
+
+export function openclawBulkConfig(models: OpenRouterModel[]): string {
+  const entries = models.map((m) =>
+    `  - name: "${m.name.replace(/"/g, '\\"')}"
+    model: "${m.id}"`
+  ).join("\n");
+  return `# OpenClaw multi-model config
+provider: openai-compatible
+base_url: https://openrouter.ai/api/v1
+api_key: \${OPENROUTER_API_KEY}
+models:
+${entries}`;
+}
+
+// ── Odysseus config ──────────────────────────────────────────────────
+export function odysseusConfig(m: OpenRouterModel): string {
+  return `# Odysseus model config
+provider: openrouter
+model: "${m.id}"
+api_key: \${OPENROUTER_API_KEY}`;
+}
+
+export function odysseusBulkConfig(models: OpenRouterModel[]): string {
+  const entries = models.map((m) =>
+    `  - name: "${m.name.replace(/"/g, '\\"')}"
+    model: "${m.id}"`
+  ).join("\n");
+  return `# Odysseus multi-model config
+provider: openrouter
+api_key: \${OPENROUTER_API_KEY}
+models:
+${entries}`;
+}
+
+// ── All config formats ───────────────────────────────────────────────
+export type ConfigFormat = "litellm" | "hermes" | "openclaw" | "odysseus" | "openwebui";
+
+export const CONFIG_FORMATS: { id: ConfigFormat; label: string; icon: string }[] = [
+  { id: "litellm", label: "LiteLLM", icon: "⚙️" },
+  { id: "hermes", label: "Hermes Agent", icon: "🤖" },
+  { id: "openclaw", label: "OpenClaw", icon: "🦞" },
+  { id: "odysseus", label: "Odysseus", icon: "🧭" },
+  { id: "openwebui", label: "Open WebUI", icon: "💬" },
+];
+
+export function singleModelConfig(m: OpenRouterModel, format: ConfigFormat): string {
+  switch (format) {
+    case "litellm": return litellmSingleModel(m);
+    case "hermes": return hermesConfig(m);
+    case "openclaw": return openclawConfig(m);
+    case "odysseus": return odysseusConfig(m);
+    case "openwebui": return `# Open WebUI Settings → Models\n# Model ID to add:\n${m.id}`;
+  }
+}
+
+export function bulkConfig(models: OpenRouterModel[], format: ConfigFormat): string {
+  switch (format) {
+    case "litellm": return litellmYaml(models);
+    case "hermes": return hermesBulkConfig(models);
+    case "openclaw": return openclawBulkConfig(models);
+    case "odysseus": return odysseusBulkConfig(models);
+    case "openwebui": return `# Open WebUI — Model IDs to add:\n${models.map((m) => m.id).join("\n")}`;
+  }
+}
+
+// ── Cost calculator ──────────────────────────────────────────────────
+export interface CostEstimate {
+  modelId: string;
+  modelName: string;
+  dailyCost: number;
+  monthlyCost: number;
+  costPerMessage: number;
+}
+
+export function estimateCost(
+  m: OpenRouterModel,
+  messagesPerDay: number,
+  avgInputTokens: number,
+  avgOutputTokens: number,
+): CostEstimate | null {
+  const inPrice = pricePerM(m.pricing?.prompt);
+  const outPrice = pricePerM(m.pricing?.completion);
+  if (inPrice === null || outPrice === null) return null; // variable pricing
+
+  const costPerMessage =
+    (avgInputTokens / 1_000_000) * inPrice +
+    (avgOutputTokens / 1_000_000) * outPrice;
+
+  const dailyCost = costPerMessage * messagesPerDay;
+  const monthlyCost = dailyCost * 30;
+
+  return {
+    modelId: m.id,
+    modelName: m.name,
+    dailyCost,
+    monthlyCost,
+    costPerMessage,
+  };
+}
+
+export function formatCost(n: number): string {
+  if (n < 0.01) return `$${n.toFixed(4)}`;
+  if (n < 1) return `$${n.toFixed(3)}`;
+  if (n < 100) return `$${n.toFixed(2)}`;
+  return `$${n.toFixed(0)}`;
+}
+
 // ── Scoring & flags ───────────────────────────────────────────────────
 const WEEK_SECONDS = 14 * 24 * 60 * 60; // 14 days
 

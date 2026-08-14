@@ -17,6 +17,8 @@ import {
   Video,
   Brain,
   FileCode,
+  GitCompare,
+  Trophy,
 } from "lucide-react";
 import {
   type OpenRouterModel,
@@ -42,9 +44,13 @@ interface ModelCardProps {
   model: OpenRouterModel;
   bookmarked: boolean;
   onToggleBookmark: (id: string) => void;
+  comparing?: boolean;
+  onToggleCompare?: (id: string) => void;
+  benchmarkScore?: number | null;
+  benchmarkRank?: number | null;
 }
 
-export function ModelCard({ model, bookmarked, onToggleBookmark }: ModelCardProps) {
+export function ModelCard({ model, bookmarked, onToggleBookmark, comparing, onToggleCompare, benchmarkScore, benchmarkRank }: ModelCardProps) {
   const [copiedId, setCopiedId] = useState(false);
   const [copiedYaml, setCopiedYaml] = useState(false);
 
@@ -115,13 +121,27 @@ export function ModelCard({ model, bookmarked, onToggleBookmark }: ModelCardProp
             </button>
           </div>
         </div>
-        <button
-          onClick={() => onToggleBookmark(model.id)}
-          className="shrink-0 text-muted-foreground transition-colors hover:text-yellow-400"
-          title={bookmarked ? "Remove bookmark" : "Bookmark model"}
-        >
-          <Star className={cn("h-5 w-5", bookmarked && "fill-yellow-400 text-yellow-400")} />
-        </button>
+        <div className="flex shrink-0 items-center gap-1">
+          {onToggleCompare && (
+            <button
+              onClick={() => onToggleCompare(model.id)}
+              className={cn(
+                "shrink-0 transition-colors",
+                comparing ? "text-blue-400" : "text-muted-foreground hover:text-blue-400"
+              )}
+              title={comparing ? "Remove from comparison" : "Add to comparison"}
+            >
+              <GitCompare className={cn("h-4 w-4", comparing && "fill-blue-400/20")} />
+            </button>
+          )}
+          <button
+            onClick={() => onToggleBookmark(model.id)}
+            className="shrink-0 text-muted-foreground transition-colors hover:text-yellow-400"
+            title={bookmarked ? "Remove bookmark" : "Bookmark model"}
+          >
+            <Star className={cn("h-5 w-5", bookmarked && "fill-yellow-400 text-yellow-400")} />
+          </button>
+        </div>
       </div>
 
       {/* Badges */}
@@ -156,6 +176,11 @@ export function ModelCard({ model, bookmarked, onToggleBookmark }: ModelCardProp
         {bigLab && (
           <Badge variant="secondary" className="bg-yellow-500/12 text-yellow-400 border-yellow-500/28">
             Flagship
+          </Badge>
+        )}
+        {benchmarkScore != null && (
+          <Badge variant="secondary" className="bg-amber-500/15 text-amber-400 border-amber-500/30" title={`Arena ELO: ${benchmarkScore}${benchmarkRank != null ? ` · Rank #${benchmarkRank}` : ""}`}>
+            <Trophy className="h-3 w-3" /> {benchmarkScore}{benchmarkRank != null ? ` · #${benchmarkRank}` : ""}
           </Badge>
         )}
       </div>

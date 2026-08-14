@@ -59,3 +59,25 @@ export interface OpenRouterModel {
 export interface OpenRouterModelsResponse {
   data: OpenRouterModel[];
 }
+
+// ── Benchmark data (LMArena / Arena AI) ──────────────────────────────
+export interface ArenaModel {
+  rank: number;
+  model: string;     // name as shown on arena.ai
+  vendor: string | null;
+  license: "proprietary" | "open" | null;
+  score: number | null;   // ELO
+  ci: number | null;      // 95% confidence interval ±
+  votes: number | null;
+}
+
+export interface ArenaLeaderboard {
+  meta: {
+    leaderboard: string;
+    source_url: string;
+    fetched_at: string;
+    last_updated?: string;
+    model_count: number;
+  };
+  models: ArenaModel[];
+}
