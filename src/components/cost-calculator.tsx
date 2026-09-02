@@ -26,7 +26,6 @@ export function CostCalculator({ models, open, onClose, selectedIds, onToggle }:
   const [avgOutputTokens, setAvgOutputTokens] = useState(800);
 
   useEffect(() => setMounted(true), []);
-  if (!mounted || !open) return null;
 
   const selectedModels = useMemo(
     () => models.filter((m) => selectedIds.has(m.id)),
@@ -38,6 +37,8 @@ export function CostCalculator({ models, open, onClose, selectedIds, onToggle }:
       .map((m) => ({ model: m, est: estimateCost(m, messagesPerDay, avgInputTokens, avgOutputTokens) }))
       .filter((x) => x.est !== null) as { model: OpenRouterModel; est: NonNullable<ReturnType<typeof estimateCost>> }[];
   }, [selectedModels, messagesPerDay, avgInputTokens, avgOutputTokens]);
+
+  if (!mounted || !open) return null;
 
   const totalMonthly = estimates.reduce((sum, x) => sum + x.est.monthlyCost, 0);
   const totalDaily = estimates.reduce((sum, x) => sum + x.est.dailyCost, 0);

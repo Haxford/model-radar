@@ -335,7 +335,10 @@ export function ModelRadar({ models, onRefresh }: ModelRadarProps) {
               </span>
             </label>
             <label className="flex cursor-pointer items-center gap-2 rounded-md px-1 py-0.5 text-sm hover:text-foreground">
-              <Checkbox checked={category === "bookmarks"} onCheckedChange={(c) => c && setCategory("bookmarks")} />
+              <Checkbox
+                checked={category === "bookmarks"}
+                onCheckedChange={(c) => setCategory(c ? "bookmarks" : "all")}
+              />
               <Star className="h-3.5 w-3.5" />
               <span className={category === "bookmarks" ? "text-foreground" : "text-muted-foreground"}>
                 Bookmarks ({bookmarks.size})
@@ -418,7 +421,7 @@ export function ModelRadar({ models, onRefresh }: ModelRadarProps) {
               size="sm"
               onClick={() => setExportOpen(true)}
               disabled={sorted.length === 0}
-              title="Export config for all visible models"
+              title={compareSet.size > 0 ? "Export config for selected models" : "Export config for all visible models"}
             >
               <Download className="h-4 w-4" />
               Export

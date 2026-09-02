@@ -26,13 +26,13 @@ export function ConfigExport({ models, open, onClose, defaultFormat = "litellm" 
   useEffect(() => setMounted(true), []);
   useEffect(() => { if (open) setFormat(defaultFormat); }, [open, defaultFormat]);
 
-  if (!mounted || !open) return null;
-
   const yaml = useMemo(() => {
     if (models.length === 0) return "# No models selected";
     if (models.length === 1) return singleModelConfig(models[0], format);
     return bulkConfig(models, format);
   }, [models, format]);
+
+  if (!mounted || !open) return null;
 
   const copy = () => {
     navigator.clipboard.writeText(yaml);
