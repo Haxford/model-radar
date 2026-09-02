@@ -137,8 +137,6 @@ export function modelCategory(m: OpenRouterModel): Category[] {
   if (out.has("text") && !out.has("image") && !out.has("audio")) {
     cats.push("text");
   }
-  // If a model has text output + image output, still show in text (multimodal)
-  if (out.has("text") && cats.length === 0) cats.push("text");
 
   // Reasoning
   if (isReasoning(m)) cats.push("reasoning");
@@ -459,7 +457,7 @@ export function getSortValue(m: OpenRouterModel, key: SortKey): number | string 
     case "new": return m.created || 0;
     case "cheap_in": {
       const v = pricePerM(m.pricing?.prompt);
-      // Variable pricing → sort last (large number for asc, -1 for desc)
+      // Variable pricing → always sorted last, regardless of direction (see sortModels)
       return v === null ? Infinity : v;
     }
     case "cheap_out": {
@@ -477,16 +475,20 @@ export function sortModels(
   key: SortKey,
   dir: SortDir
 ): OpenRouterModel[] {
-  const sorted = [...models].sort((a, b) => {
+  const sign = dir === "asc" ? 1 : -1;
+  return [...models].sort((a, b) => {
     const va = getSortValue(a, key);
     const vb = getSortValue(b, key);
     if (typeof va === "string" || typeof vb === "string") {
-      return String(va).localeCompare(String(vb));
+      return sign * String(va).localeCompare(String(vb));
     }
-    return va - vb;
+    // Unknown prices (variable pricing) always sort last, whichever direction.
+    if (va === Infinity || vb === Infinity) {
+      if (va === vb) return 0;
+      return va === Infinity ? 1 : -1;
+    }
+    return sign * (va - vb);
   });
-  // For ascending, smallest first. For descending, largest first.
-  return dir === "asc" ? sorted : sorted.reverse();
 }
 
 // ── Misc ──────────────────────────────────────────────────────────────
